@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <script type="text/javascript" src="https://api.mapy.cz/loader.js"></script>
+    <script type="text/javascript">Loader.load(null, { suggest: true });</script>
+</head>
+
+<body>
+    <div style="display:none">
+        <h1>Našeptávač</h1>
+        <input type="text" value="" placeholder="hledaná fráze" />
+    </div>
+    <div id="parent" style="height:500px">
+        <div id="m" style="height:100%"></div>
+    </div>
+</body>
+
+</html>
+
+<script>
+    // the nodes are stated here
+
+    const places = ["Auckland", "Christchurch", "Wellington"].map(el => el + ", Nový Zéland")
+    /*const places = ["Christchurch",
+        "Mount Cook",
+        "Dunedin",
+        "Bluff",
+        "Milford Sound",
+        "Glacier fox",
+        "Hokitika",
+        "Pancake Rocks and Blowholes",
+        "Arthurův Průsmyk",
+        "Kaikoura",
+        "Lake Rotoiti",
+        "Nelson",
+        "Takaka",
+        "Picton"].map(el => el + ", Nový Zéland")*/
+</script>
+
+<!-- Load offline data -->
+<script>let offline_data = [];</script>
+<!-- <script src="offline-data.js"></script> -->
+
+<script>
+    // create the map
+    let center = SMap.Coords.fromWGS84(14.1, 50.1);
+    let m = new SMap(JAK.gel("m"), center);
+    m.addDefaultLayer(SMap.DEF_BASE).enable();
+    m.addDefaultControls();
+
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+
+    class Place {
+        constructor(name, coordinates = null, distances = null) {
+            this.name = name
+            // if (suffix) {
+            //     this.name += ", " + suffix
+            // }
+            this.coordinates = coordinates
+            this.distances = distances || {} // {place.name: {"time": int, "length": m}}
+        }
+
+        /**
+         * return true if coordinates already exist
+         * */
+        assure_coord() {
+            if (this.coordinates) {
+                return true;
+            }
+
+            return (new SMap.SuggestProvider()).get(this.name).then((addresses) => {
+                console.log("Coordinates", this.name)
+                if (addresses.length < 1) {
+                    console.log("Addresses error", addresses);
+                    return;
+                }
+                this.coordinates = addresses[0]
+            });
+        }
+
+        coord() {
+            if (!this.coordinates) {
+                console.warn("Unknown coordinates of", this.name)
+            }
+            return SMap.Coords.fromWGS84(this.coordinates.longitude, this.coordinates.latitude)
+        }
+
+        static async assure_all_coord(places) {
+            for (const place of places) {
+                if (!place.assure_coord()) {
+                    await sleep(200)
+                }
+            }
+        }
+
+        async compute_distance(place) {
+            if (this.distances[place.name]) { // we already have this distance
+                return;
+            }
+            await sleep(200) // XX assure_coord could be replaces by assure_all_coord
+            Promise.all([this.assure_coord(), place.assure_coord()].filter(e => e)).then(() => {
+
+                new SMap.Route([this.coord(), place.coord()], (data) => {
+                    const [time, len] = [data._results.time, data._results.length]
+                    console.log("Distance", this.name, place.name, `${len} m, ${time} s`)
+
+                    this.distances[place.name] = { "time": time, "length": len }
+                });
+            })
+        }
+
+        /** Serialize all places to offline use
+         */
+        static output_objects() {
+            return all_places
+        }
+    }
+    // build all_places from cache
+    /** @type {Place[]} */
+    const all_places = offline_data.map(place => {
+        const p = new Place(...Object.values(place))
+        if (places.includes(p.name)) {// this one has been cached, ignore
+            places.splice(places.indexOf(p.name), 1)
+        }
+        return p
+    }).concat(places.map(place_name => new Place(place_name)))
+
+
+
+
+    /**
+     * Call each other place and count the length in between.
+     * */
+    async function start() {
+        for (place of all_places) {
+            all_places.filter(p => p !== place).map(p => place.compute_distance(p))
+            await sleep(200);
+        }
+        console.log("Start finished. Continue with `generate_matrix_length`.")
+    }
+
+    console.log("Tutorial: Hardcode places. Call `start`. You may store semi-results with `Places.get_output()` to `offline_data`. Call `generate_matrix_length`. Go to Python to solve TSP. Call `display_route()`. ")
+
+    function generate_matrix_time() {
+        return _generate_matrix("time")
+    }
+    function generate_matrix_length() {
+        return _generate_matrix("length", ((x) => Math.round(x / 1000)))
+    }
+    function _generate_matrix(pivot, callback = null) {
+        lines = []
+        lines.push([""].concat(all_places.map(place => place.name)))
+        for (place1 of all_places) {
+            line = [place1.name]
+            for (place2 of all_places) {
+                try {
+                    let val = (place1 == place2) ? 0 : place1.distances[place2.name][pivot]
+                    if (callback) {
+                        val = callback(val)
+                    }
+                    line.push(val)
+                } catch (e) {
+                    console.warn("Value not found", "place1", place1.name, "place2", place2.name, "wanted", pivot)
+                }
+            }
+            lines.push(line)
+        }
+
+        return lines
+        lines = lines.map(line => line.join("\t")).join("\n")
+
+    }
+
+    /*
+    *
+    * In new window, open route through all places in `all_places`.
+    * names - optional list of strings, use places in order of their names.
+    */
+    async function display_route(names = null) {
+        let points;
+        if (names) {
+            points = names.map(name => all_places.find(p => p.name == name))
+        } else {
+            points = all_places
+            await Place.assure_all_coord(points)
+        }
+
+        var nalezeno = function (route) {
+            var vrstva = new SMap.Layer.Geometry();
+            m.addLayer(vrstva).enable();
+
+            var coords = route.getResults().geometry;
+            var cz = m.computeCenterZoom(coords);
+            m.setCenterZoom(cz[0], cz[1]);
+            var g = new SMap.Geometry(SMap.GEOMETRY_POLYLINE, null, coords);
+            vrstva.addGeometry(g);
+            console.log("Route", route)
+            window.open(route._results.url)
+        }
+        // nove volani - staticka metoda, predame pole se souradnicemi a chceme vratit hlavne geometrii trasy
+        console.log("Displaying route", points)
+
+        let  coords;
+        try {
+            coords = points.map(place => place.coord())
+        } catch (e) {
+            console.log("***Probably loading coordinates, call again.***")
+            return
+        }
+        const route = SMap.Route.route(coords, {
+            geometry: true
+        }).then(nalezeno);
+    }
+
+</script>
+</body>
+
+</html>
