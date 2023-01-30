@@ -22,7 +22,46 @@
 <script>
     // the nodes are stated here
 
-    const places = ["Auckland", "Christchurch", "Wellington"].map(el => el + ", Nový Zéland")
+    // const places = ["Hobbiton", "Huka Falls", "Tawhai Falls", "Tongariro", "Whakapapa", "Mt Victoria", "Ohakune, Mangawhero", "Weta Cave", "Nelson Lakes, Mt Robert", "Pelorus Bridge", "Mount Gunn", "Mt Aspiring", "Wanaka nábřeží", "Remarkables", "Glenorchy", "Paradise", "Glenorchy", "Ford Bruinen", "Lake Alta", "Te Anau", "Waiau", "Gibbston Valley", "Lindiss Pass",].map(el => el + ", Nový Zéland")
+    let places = [
+"Christchurch, Nový Zéland",
+"Mount Cook, Nový Zéland",
+"Dunedin, Nový Zéland",
+"Bluff, Nový Zéland",
+"Milford Sound, Nový Zéland",
+"Glacier fox, Nový Zéland",
+"Hokitika, Nový Zéland",
+"Pancake Rocks and Blowholes, Nový Zéland",
+"Arthurův Průsmyk, Nový Zéland",
+"Kaikoura, Nový Zéland",
+"Lake Rotoiti, Nový Zéland",
+"Nelson, Nový Zéland",
+"Takaka, Nový Zéland",
+"Picton, Nový Zéland",
+"Wellington, Nový Zéland",
+"Dawson Falls, Nový Zéland",
+"New Plymouth, Nový Zéland",
+"Te Rewa Rewa Bridge, Nový Zéland",
+"Mokau, Nový Zéland",
+"Waitomo Cave, Nový Zéland",
+"Mangatepopo Car PARK, Nový Zéland",
+"Taupo, Nový Zéland",
+"Rotorua, Nový Zéland",
+"Rainbow Crater, Nový Zéland",
+"Matamata, Nový Zéland",
+"Hahei, Nový Zéland",
+"Auckland, Nový Zéland",
+"Puhoi, Nový Zéland",
+"Whangarei, Nový Zéland",
+"Paihia, Nový Zéland",
+"Kaitaia, Nový Zéland",
+
+
+]//.map(el => el + ", Nový Zéland")
+    //const places = ["Wellington, Nový Zéland", "Dawson Falls, Nový Zéland", "New Plymouth, Nový Zéland", "Te Rewa Rewa Bridge, Nový Zéland", "Mokau, Nový Zéland",  "Mangatepopo Car PARK, Nový Zéland", "Taupo, Nový Zéland", "Rotorua, Nový Zéland", "Rainbow Crater, Nový Zéland", "Matamata, Nový Zéland", "Hahei, Nový Zéland", "Puhoi, Nový Zéland", "Whangarei, Nový Zéland", "Paihia, Nový Zéland", "Kaitaia, Nový Zéland","Auckland, Nový Zéland", ]
+
+
+
     /*const places = ["Christchurch",
         "Mount Cook",
         "Dunedin",
@@ -45,10 +84,16 @@
 
 <script>
     // create the map
-    let center = SMap.Coords.fromWGS84(14.1, 50.1);
+    let center = SMap.Coords.fromWGS84(177, -40);
     let m = new SMap(JAK.gel("m"), center);
     m.addDefaultLayer(SMap.DEF_BASE).enable();
     m.addDefaultControls();
+
+    // marker layer
+    var layer = new SMap.Layer.Marker();
+    m.addLayer(layer);
+    layer.enable();
+
 
     const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -59,15 +104,24 @@
             // if (suffix) {
             //     this.name += ", " + suffix
             // }
-            this.coordinates = coordinates
-            this.distances = distances || {} // {place.name: {"time": int, "length": m}}
+
+
+            let cache;
+            try {// if there is something wrong in cache
+                cache = JSON.parse(localStorage.getItem(this.name)) || {}
+            } catch (e) {
+                cache = {}
+            }
+
+            this.coordinates = coordinates || cache.coordinates || {}
+            this.distances = distances || cache.distances || {} // {place.name: {"time": int, "length": m}}
         }
 
         /**
          * return true if coordinates already exist
          * */
         assure_coord() {
-            if (this.coordinates) {
+            if (this.coordinates && Object.keys(this.coordinates).length) {
                 return true;
             }
 
@@ -78,11 +132,12 @@
                     return;
                 }
                 this.coordinates = addresses[0]
+                this.cache_self()
             });
         }
 
         coord() {
-            if (!this.coordinates) {
+            if (!this.coordinates || !Object.keys(this.coordinates).length) {
                 console.warn("Unknown coordinates of", this.name)
             }
             return SMap.Coords.fromWGS84(this.coordinates.longitude, this.coordinates.latitude)
@@ -98,16 +153,16 @@
 
         async compute_distance(place) {
             if (this.distances[place.name]) { // we already have this distance
-                return;
+                return true;
             }
-            await sleep(200) // XX assure_coord could be replaces by assure_all_coord
             Promise.all([this.assure_coord(), place.assure_coord()].filter(e => e)).then(() => {
-
                 new SMap.Route([this.coord(), place.coord()], (data) => {
                     const [time, len] = [data._results.time, data._results.length]
                     console.log("Distance", this.name, place.name, `${len} m, ${time} s`)
-
-                    this.distances[place.name] = { "time": time, "length": len }
+                    if (time && len) {
+                        this.distances[place.name] = { "time": time, "length": len }
+                        this.cache_self()
+                    }
                 });
             })
         }
@@ -117,7 +172,14 @@
         static output_objects() {
             return all_places
         }
+
+        cache_self() {
+            localStorage.setItem(this.name, JSON.stringify(this))
+        }
+
     }
+
+
     // build all_places from cache
     /** @type {Place[]} */
     const all_places = offline_data.map(place => {
@@ -125,9 +187,10 @@
         if (places.includes(p.name)) {// this one has been cached, ignore
             places.splice(places.indexOf(p.name), 1)
         }
+        p.assure_coord()
         return p
     }).concat(places.map(place_name => new Place(place_name)))
-
+    Place.assure_all_coord(all_places)
 
 
 
@@ -135,9 +198,15 @@
      * Call each other place and count the length in between.
      * */
     async function start() {
-        for (place of all_places) {
-            all_places.filter(p => p !== place).map(p => place.compute_distance(p))
-            await sleep(200);
+        for (const place of all_places) {
+            for (const p of all_places.filter(p => p !== place)) {
+                if(place.compute_distance(p) !== true){
+                    await sleep(100); // XX might be refactored to waiting for promise instead as the API hangs sometimes if overused
+                } else {
+                    console.log("204: Cachee", p)
+
+                }
+            }
         }
         console.log("Start finished. Continue with `generate_matrix_length`.")
     }
@@ -174,21 +243,24 @@
 
     }
 
+    function _names_to_places(names = null) {
+        const points = names ? (names.map(name => all_places.find(p => p.name == name))) : all_places
+        console.log("Displaying route", points)
+        return points
+    }
+
     /*
     *
     * In new window, open route through all places in `all_places`.
     * names - optional list of strings, use places in order of their names.
     */
     async function display_route(names = null) {
-        let points;
-        if (names) {
-            points = names.map(name => all_places.find(p => p.name == name))
-        } else {
-            points = all_places
-            await Place.assure_all_coord(points)
-        }
-
         var nalezeno = function (route) {
+            if (route._results.error) {
+                console.log("***Cannot find route", route)
+                return
+            }
+            console.log("Route", route)
             var vrstva = new SMap.Layer.Geometry();
             m.addLayer(vrstva).enable();
 
@@ -197,22 +269,35 @@
             m.setCenterZoom(cz[0], cz[1]);
             var g = new SMap.Geometry(SMap.GEOMETRY_POLYLINE, null, coords);
             vrstva.addGeometry(g);
-            console.log("Route", route)
             window.open(route._results.url)
         }
-        // nove volani - staticka metoda, predame pole se souradnicemi a chceme vratit hlavne geometrii trasy
-        console.log("Displaying route", points)
 
-        let  coords;
-        try {
-            coords = points.map(place => place.coord())
-        } catch (e) {
-            console.log("***Probably loading coordinates, call again.***")
-            return
-        }
-        const route = SMap.Route.route(coords, {
+        const places = _names_to_places(names)
+        const route = SMap.Route.route(places.map(place => place.coord()), {
             geometry: true
         }).then(nalezeno);
+    }
+
+    async function display_markers(names = null) {
+        _names_to_places(names).forEach(place => {
+
+            var card = new SMap.Card();
+            card.getHeader().innerHTML = "<strong>Nadpis</strong>";
+            card.getBody().innerHTML = "Ahoj, já jsem <em>obsah vizitky</em>!";
+
+            // const znacka = JAK.mel("div");
+            // const popisek = JAK.mel("div", {}, {position:"absolute", left:"0px", top:"2px", textAlign:"center", width:"22px", color:"white", fontWeight:"bold"});
+            // popisek.innerHTML = this.name;
+            // znacka.appendChild(popisek);
+
+
+            const marker = new SMap.Marker(place.coord(), place.name, {
+                title: place.name,
+                // url: znacka
+            });
+            marker.decorate(SMap.Marker.Feature.Card, card);
+            layer.addMarker(marker);
+        })
     }
 
 </script>
