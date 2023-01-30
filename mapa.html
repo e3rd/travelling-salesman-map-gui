@@ -24,40 +24,41 @@
 
     // const places = ["Hobbiton", "Huka Falls", "Tawhai Falls", "Tongariro", "Whakapapa", "Mt Victoria", "Ohakune, Mangawhero", "Weta Cave", "Nelson Lakes, Mt Robert", "Pelorus Bridge", "Mount Gunn", "Mt Aspiring", "Wanaka nábřeží", "Remarkables", "Glenorchy", "Paradise", "Glenorchy", "Ford Bruinen", "Lake Alta", "Te Anau", "Waiau", "Gibbston Valley", "Lindiss Pass",].map(el => el + ", Nový Zéland")
     let places = [
-"Christchurch, Nový Zéland",
-"Mount Cook, Nový Zéland",
-"Dunedin, Nový Zéland",
-"Bluff, Nový Zéland",
-"Milford Sound, Nový Zéland",
-"Glacier fox, Nový Zéland",
-"Hokitika, Nový Zéland",
-"Pancake Rocks and Blowholes, Nový Zéland",
-"Arthurův Průsmyk, Nový Zéland",
-"Kaikoura, Nový Zéland",
-"Lake Rotoiti, Nový Zéland",
-"Nelson, Nový Zéland",
-"Takaka, Nový Zéland",
-"Picton, Nový Zéland",
-"Wellington, Nový Zéland",
-"Dawson Falls, Nový Zéland",
-"New Plymouth, Nový Zéland",
-"Te Rewa Rewa Bridge, Nový Zéland",
-"Mokau, Nový Zéland",
-"Waitomo Cave, Nový Zéland",
-"Mangatepopo Car PARK, Nový Zéland",
-"Taupo, Nový Zéland",
-"Rotorua, Nový Zéland",
-"Rainbow Crater, Nový Zéland",
-"Matamata, Nový Zéland",
-"Hahei, Nový Zéland",
-"Auckland, Nový Zéland",
-"Puhoi, Nový Zéland",
-"Whangarei, Nový Zéland",
-"Paihia, Nový Zéland",
-"Kaitaia, Nový Zéland",
+        "Christchurch, Nový Zéland",
+        "Mount Cook, Nový Zéland",
+        "Dunedin, Nový Zéland",
+        "Bluff, Nový Zéland",
+        "Milford Sound, Nový Zéland",
+        "Glacier fox, Nový Zéland",
+        "Hokitika, Nový Zéland",
+        "Pancake Rocks and Blowholes, Nový Zéland",
+        "Arthurův Průsmyk, Nový Zéland",
+        "Kaikoura, Nový Zéland",
+        "Lake Rotoiti, Nový Zéland",
+        "Nelson, Nový Zéland",
+        "Takaka, Nový Zéland",
+        "Picton, Nový Zéland",
+        "Wellington, Nový Zéland",
+        "Dawson Falls, Nový Zéland",
+        "New Plymouth, Nový Zéland",
+        "Te Rewa Rewa Bridge, Nový Zéland",
+        "Mokau, Nový Zéland",
+        "Waitomo Cave, Nový Zéland",
+        "Mangatepopo Car PARK, Nový Zéland",
+        "Taupo, Nový Zéland",
+        "Rotorua, Nový Zéland",
+        "Rainbow Crater, Nový Zéland",
+        "Matamata, Nový Zéland",
+        "Hahei, Nový Zéland",
+        "Auckland, Nový Zéland",
+        "Puhoi, Nový Zéland",
+        "Whangarei, Nový Zéland",
+        "Paihia, Nový Zéland",
+        "Kaitaia, Nový Zéland",
 
 
-]//.map(el => el + ", Nový Zéland")
+    ]//.map(el => el + ", Nový Zéland")
+    // places = ["Praha", "Brno", "Ostrava"]
     //const places = ["Wellington, Nový Zéland", "Dawson Falls, Nový Zéland", "New Plymouth, Nový Zéland", "Te Rewa Rewa Bridge, Nový Zéland", "Mokau, Nový Zéland",  "Mangatepopo Car PARK, Nový Zéland", "Taupo, Nový Zéland", "Rotorua, Nový Zéland", "Rainbow Crater, Nový Zéland", "Matamata, Nový Zéland", "Hahei, Nový Zéland", "Puhoi, Nový Zéland", "Whangarei, Nový Zéland", "Paihia, Nový Zéland", "Kaitaia, Nový Zéland","Auckland, Nový Zéland", ]
 
 
@@ -90,9 +91,9 @@
     m.addDefaultControls();
 
     // marker layer
-    var layer = new SMap.Layer.Marker();
-    m.addLayer(layer);
-    layer.enable();
+    var marker_layer = new SMap.Layer.Marker();
+    m.addLayer(marker_layer);
+    marker_layer.enable();
 
 
     const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -126,12 +127,12 @@
             }
 
             return (new SMap.SuggestProvider()).get(this.name).then((addresses) => {
-                console.log("Coordinates", this.name)
                 if (addresses.length < 1) {
-                    console.log("Addresses error", addresses);
+                    console.log("Coordinates error", this.name, addresses);
                     return;
                 }
                 this.coordinates = addresses[0]
+                console.log("Coordinates", this.name, "possibilities:", addresses.length, this.coordinates)
                 this.cache_self()
             });
         }
@@ -143,28 +144,28 @@
             return SMap.Coords.fromWGS84(this.coordinates.longitude, this.coordinates.latitude)
         }
 
+        /**
+         * @param {Place[]} places
+         */
         static async assure_all_coord(places) {
             for (const place of places) {
-                if (!place.assure_coord()) {
-                    await sleep(200)
-                }
+                await place.assure_coord()
             }
         }
 
-        async compute_distance(place) {
+        compute_distance(place) {
             if (this.distances[place.name]) { // we already have this distance
                 return true;
             }
-            Promise.all([this.assure_coord(), place.assure_coord()].filter(e => e)).then(() => {
-                new SMap.Route([this.coord(), place.coord()], (data) => {
-                    const [time, len] = [data._results.time, data._results.length]
-                    console.log("Distance", this.name, place.name, `${len} m, ${time} s`)
-                    if (time && len) {
-                        this.distances[place.name] = { "time": time, "length": len }
-                        this.cache_self()
-                    }
-                });
-            })
+            return (new SMap.Route([this.coord(), place.coord()], (route) => {
+                const [time, len] = [route._results.time, route._results.length]
+                console.log(`${this.name} -> ${place.name}: ${len} m, ${time} s`)
+                if (time && len) {
+                    _show_route_on_map(route) // XX looks amazing but slows down, might make it togglable in UI
+                    this.distances[place.name] = { "time": time, "length": len }
+                    this.cache_self()
+                }
+            })).getPromise()
         }
 
         /** Serialize all places to offline use
@@ -191,6 +192,8 @@
         return p
     }).concat(places.map(place_name => new Place(place_name)))
     Place.assure_all_coord(all_places)
+    console.log("Coords assured, displaying markers.")
+    display_markers()
 
 
 
@@ -200,12 +203,10 @@
     async function start() {
         for (const place of all_places) {
             for (const p of all_places.filter(p => p !== place)) {
-                if(place.compute_distance(p) !== true){
-                    await sleep(100); // XX might be refactored to waiting for promise instead as the API hangs sometimes if overused
-                } else {
-                    console.log("204: Cachee", p)
-
-                }
+                // XX if wanted to increase the performance,
+                // we may launch around 6 API call instead of waiting
+                // till the single one ends
+                await place.compute_distance(p)
             }
         }
         console.log("Start finished. Continue with `generate_matrix_length`.")
@@ -244,9 +245,20 @@
     }
 
     function _names_to_places(names = null) {
-        const points = names ? (names.map(name => all_places.find(p => p.name == name))) : all_places
-        console.log("Displaying route", points)
-        return points
+        const places = names ? (names.map(name => all_places.find(p => p.name == name))) : all_places
+        console.log("Displaying route", places)
+        return places
+    }
+
+    var geometry_layer = new SMap.Layer.Geometry();
+    m.addLayer(geometry_layer).enable();
+
+    function _show_route_on_map(route) {
+        var coords = route.getResults().geometry
+        // m.setCenterZoom(...m.computeCenterZoom(coords))
+        var g = new SMap.Geometry(SMap.GEOMETRY_POLYLINE, null, coords)
+        geometry_layer.clear()
+        geometry_layer.addGeometry(g)
     }
 
     /*
@@ -261,14 +273,7 @@
                 return
             }
             console.log("Route", route)
-            var vrstva = new SMap.Layer.Geometry();
-            m.addLayer(vrstva).enable();
-
-            var coords = route.getResults().geometry;
-            var cz = m.computeCenterZoom(coords);
-            m.setCenterZoom(cz[0], cz[1]);
-            var g = new SMap.Geometry(SMap.GEOMETRY_POLYLINE, null, coords);
-            vrstva.addGeometry(g);
+            _show_route_on_map(route)
             window.open(route._results.url)
         }
 
@@ -279,7 +284,8 @@
     }
 
     async function display_markers(names = null) {
-        _names_to_places(names).forEach(place => {
+        const places = _names_to_places(names)
+        places.forEach(place => {
 
             var card = new SMap.Card();
             card.getHeader().innerHTML = "<strong>Nadpis</strong>";
@@ -290,14 +296,16 @@
             // popisek.innerHTML = this.name;
             // znacka.appendChild(popisek);
 
-
             const marker = new SMap.Marker(place.coord(), place.name, {
                 title: place.name,
                 // url: znacka
             });
             marker.decorate(SMap.Marker.Feature.Card, card);
-            layer.addMarker(marker);
+            marker_layer.addMarker(marker);
         })
+
+        // centralize the map
+        m.setCenterZoom(...m.computeCenterZoom(places.map(p => p.coord())))
     }
 
 </script>
