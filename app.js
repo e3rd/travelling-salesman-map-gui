@@ -1,108 +1,30 @@
-
 // the nodes are stated here
 let places = [
-    "Christchurch, Nový Zéland",
-    "Mount Cook, Nový Zéland",
-    "Dunedin, Nový Zéland"
+    "Wellington, Nový Zéland",
+    "Tawhai Falls, Nový Zéland",
+    "Whakapapa ski, Nový Zéland",
+    "Mangawhero Falls, Nový Zéland",
+    "Mount Victoria, Nový Zéland",
+    "Huka Falls, Nový Zéland",
+    "Putangirua Pinnacles, Nový Zéland",
+    "Dawson Falls, Nový Zéland",
+    "New Plymouth, Nový Zéland",
+    "Rainbow Crater, Nový Zéland"
 ]//.map(el => el + ", Nový Zéland")
 
 
 // create the map
-let center = SMap.Coords.fromWGS84(177, -40);
-let m = new SMap(JAK.gel("m"), center);
-m.addDefaultLayer(SMap.DEF_BASE).enable();
-m.addDefaultControls();
+let center = SMap.Coords.fromWGS84(177, -40)
+let m = new SMap(JAK.gel("m"), center)
+m.addDefaultLayer(SMap.DEF_BASE).enable()
+m.addDefaultControls()
 
 // marker layer
-var marker_layer = new SMap.Layer.Marker();
-m.addLayer(marker_layer);
-marker_layer.enable();
+var marker_layer = new SMap.Layer.Marker()
+m.addLayer(marker_layer)
+marker_layer.enable()
 
-
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-
-
-class Place {
-    constructor(name, coordinates = null, distances = null) {
-        this.name = name
-        // if (suffix) {
-        //     this.name += ", " + suffix
-        // }
-
-
-        let cache;
-        try {// if there is something wrong in cache
-            cache = JSON.parse(localStorage.getItem(this.name)) || {}
-        } catch (e) {
-            cache = {}
-        }
-
-        this.coordinates = coordinates || cache.coordinates || {}
-        this.distances = distances || cache.distances || {} // {place.name: {"time": int, "length": m}}
-    }
-
-    /**
-     * return true if coordinates already exist
-     * */
-    assure_coord() {
-        if (this.coordinates && Object.keys(this.coordinates).length) {
-            return true;
-        }
-
-        return (new SMap.SuggestProvider()).get(this.name).then((addresses) => {
-            if (addresses.length < 1) {
-                console.log("Coordinates error", this.name, addresses);
-                return;
-            }
-            this.coordinates = addresses[0]
-            console.log("Coordinates", this.name, "possibilities:", addresses.length, this.coordinates)
-            this.cache_self()
-        });
-    }
-
-    coord() {
-        if (!this.coordinates || !Object.keys(this.coordinates).length) {
-            console.warn("Unknown coordinates of", this.name)
-        }
-        return SMap.Coords.fromWGS84(this.coordinates.longitude, this.coordinates.latitude)
-    }
-
-    /**
-     * @param {Place[]} places
-    */
-    static async assure_all_coord(places) {
-        for (const place of places) {
-            await place.assure_coord()
-        }
-    }
-
-    compute_distance(place) {
-        if (this.distances[place.name]) { // we already have this distance
-            return true;
-        }
-        return (new SMap.Route([this.coord(), place.coord()], (route) => {
-            const [time, len] = [route._results.time, route._results.length]
-            console.log(`${this.name} -> ${place.name}: ${len} m, ${time} s`)
-            if (time && len) {
-                _show_route_on_map(route) // XX looks amazing but slows down, might make it togglable in UI
-                this.distances[place.name] = { "time": time, "length": len }
-                this.cache_self()
-            }
-        })).getPromise()
-    }
-
-    /** Serialize all places to offline use
-     */
-    static output_objects() {
-        return all_places
-    }
-
-    cache_self() {
-        localStorage.setItem(this.name, JSON.stringify(this))
-    }
-
-}
-
+const sleep = ms => new Promise(r => setTimeout(r, ms))
 
 // build all_places from cache
 /** @type {Place[]} */
@@ -110,8 +32,6 @@ const all_places = places.map(place_name => new Place(place_name))
 Place.assure_all_coord(all_places)
 console.log("Coords assured, displaying markers.")
 display_markers()
-
-
 
 /**
  * Call each other place and count the length in between.
@@ -125,10 +45,11 @@ async function start() {
             await place.compute_distance(p)
         }
     }
-    console.log("Start finished. Continue with `generate_matrix_length`.")
+    geometry_layer.clear() // routes might have been cast to the map
+    console.info("Start finished. Continue with `generate_matrix_length`.")
 }
 
-console.log("Tutorial: Hardcode places. Call `start`. Results are automatically cache to localStorage. Call `generate_matrix_length`. Go to Python to solve TSP. Call `display_route()`. ")
+console.info("Tutorial: Hardcode places. Call `start`. Results are automatically cache to localStorage. Call `generate_matrix_length`. Go to Python to solve TSP. Call `display_route()`. ")
 
 function generate_matrix_time() {
     return _generate_matrix("time")
@@ -136,12 +57,29 @@ function generate_matrix_time() {
 function generate_matrix_length() {
     return _generate_matrix("length", ((x) => Math.round(x / 1000)))
 }
+
+
+function run(matrix) {
+    const { bare, places } = transform_matrix(matrix)
+    const solution = TSP(bare).map(n => places[n])
+    console.log(solution)
+    display_route(solution)
+}
+
+/**
+ * Takes matrix generated by generate_matrix_length, replaces 0 with Infinity and removes cities
+ * @param {number[][]} matrix
+ */
+function transform_matrix(matrix) {
+    return { "bare": matrix.slice(1).map(row => row.slice(1).map(val => val === 0 ? Infinity : val)), "places": matrix[0].slice(1) }
+}
+
 function _generate_matrix(pivot, callback = null) {
     lines = []
     lines.push([""].concat(all_places.map(place => place.name)))
-    for (place1 of all_places) {
+    for (const place1 of all_places) {
         line = [place1.name]
-        for (place2 of all_places) {
+        for (const place2 of all_places) {
             try {
                 let val = (place1 == place2) ? 0 : place1.distances[place2.name][pivot]
                 if (callback) {
