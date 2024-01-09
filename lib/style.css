@@ -1,0 +1,14 @@
+#sidebar {
+    display: flex;
+    flex-direction: column;
+    margin: 25px;
+
+    textarea {
+        height: 300px;
+    }
+}
+
+#progress {
+    display: hidden;
+    width: 100%;
+}
