@@ -12,7 +12,6 @@
         crossorigin="anonymous"></script>
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"
         integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
-
     <script src="https://cdn.jsdelivr.net/gh/e3rd/WebHotkeys@0.9.0/WebHotkeys.js"></script>
 
     <link rel="stylesheet" href="lib/style.css">
@@ -32,15 +31,21 @@
 Brno
 Olomouc
 České Budějovice
-Plzeň">
+Plzeň" data-shortcut="Alt+t" autofocus>
 </textarea>
-        <input title="Suffix appended to every place" id="place_suffix" placeholder="Czech republic"
-            value="Nový Zéland">
+        <input title="Suffix appended to every place" id="place_suffix" placeholder="Czech republic" value="" data-shortcut="Alt+s">
         <div id="controls">
             <button data-shortcut="Ctrl+Enter" title="Start computation" type="button" id="start"
                 class="btn btn-primary" disabled>⏵</button>
             <a data-shortcut="Alt+g" title="Display the route on the Mapy.cz" type="button" id="go-to-map"
                 class="btn btn-primary disabled" disabled target="_new" href="#" role="button">go to map</a>
+            <select id="criterion" data-shortcut="Alt+c">
+                <option value="fast">fast 🚙</option>
+                <option value="short">short 🚙</option>
+                <option value="turist1">turist1 🚶</option>
+                <option value="turist2">turist2 🚶</option>
+                <option value="bike1">bike1 🚲</option>
+            </select>
         </div>
         <div id="status" title="Status bar"></div>
         <progress id="progress" hidden></progress>
